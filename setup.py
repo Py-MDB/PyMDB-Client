@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="pymdb",
+    name="pymdbclient",
     version="1.0.0",
     description="Python package/CLI client for working with PyMDB",
     url="https://github.com/Py-MDB/PyMDB-Client",
