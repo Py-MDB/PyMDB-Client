@@ -20,7 +20,7 @@ import argparse
 
 
 class Papi:
-    def __init__(self, base_url):
+    def __init__(self, base_url, user_token, app_token):
         """
         Initialize the HttpClient with a base URL.
 
@@ -28,6 +28,26 @@ class Papi:
             base_url (str): The base URL of the REST API.
         """
         self.base_url = base_url
+        self.user_token = user_token
+        self.app_token = app_token
+        self.headers = {
+            'User-Token': self.user_token,
+            'App-Token': self.app_token,
+            "Content-Type": "application/json",
+        }
+
+    def _request(self, method, endpoint, params=None, data=None):
+        url = f"{self.base_url}/{endpoint}"
+        headers = self.headers.copy()
+        if data is not None:
+            if isinstance(data, dict):
+                data = json.dumps(data)
+        response = requests.request(method, url, params=params, data=data, headers=headers)
+        try: 
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP Error: {e}\n{response.text}")
+        return response
 
     def get(self, endpoint, params=None):
         """
@@ -40,46 +60,35 @@ class Papi:
         Returns:
             Response: The response from the API.
         """
-        url = f"{self.base_url}/{endpoint}"
-        response = requests.get(url, params=params)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        return response
+        return self._request("GET", endpoint, params=params)
 
-    def post(self, endpoint, data=None, json=None):
+    def post(self, endpoint, data=None, params=None):
         """
         Send a POST request to the specified endpoint.
 
         Args:
             endpoint (str): The API endpoint to send the request to.
             data (dict): The form data to include in the request.
-            json (dict): The JSON data to include in the request.
 
         Returns:
             Response: The response from the API.
         """
-        url = f"{self.base_url}/{endpoint}"
-        response = requests.post(url, data=data, json=json)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        return response
+        return self._request("POST", endpoint, data=data, params=params)
 
-    def put(self, endpoint, data=None, json=None):
+    def put(self, endpoint, data=None, params=None):
         """
         Send a PUT request to the specified endpoint.
 
         Args:
             endpoint (str): The API endpoint to send the request to.
             data (dict): The form data to include in the request.
-            json (dict): The JSON data to include in the request.
 
         Returns:
             Response: The response from the API.
         """
-        url = f"{self.base_url}/{endpoint}"
-        response = requests.put(url, data=data, json=json)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        return response
+        return self._request("PUT", endpoint, data=data, params=params)
 
-    def delete(self, endpoint, params=None):
+    def delete(self, endpoint, data=None, params=None):
         """
         Send a DELETE request to the specified endpoint.
 
@@ -90,10 +99,7 @@ class Papi:
         Returns:
             Response: The response from the API.
         """
-        url = f"{self.base_url}/{endpoint}"
-        response = requests.delete(url, params=params)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        return response
+        return self._request("DELETE", endpoint, data=data, params=params)
 
     def paginate(self, endpoint, params=None):
         """
@@ -113,7 +119,7 @@ class Papi:
         
         combined_results = []
         while True:
-            response = self.get(endpoint, params=params)
+            response = self._request("GET", endpoint, params=params)
             response_json = response.json()
             top_level_key = next(iter(response_json.keys() - {'meta'}))
             combined_results.extend(response_json.get(top_level_key, []))
@@ -145,18 +151,21 @@ def main():
 
     configreader = ConfigReader()
     base_url = configreader.get_base_url()
-    papi = Papi(base_url)
+    user_token = configreader.get_user_token()
+    app_token = configreader.get_app_token()
+
+    papi = Papi(base_url, user_token, app_token)
 
     endpoint = args.endpoint
     params = args.params
     data = args.data
     
     if args.delete:
-        result = papi.delete(endpoint, params)
+        result = papi.delete(endpoint, data, params)
     elif args.put:
-        result = papi.put(endpoint, params)
+        result = papi.put(endpoint, data, params)
     elif args.post:
-        result = papi.post(endpoint, params)
+        result = papi.post(endpoint, data, params)
     elif args.paginate:
         result = papi.paginate(endpoint, params)
     else:
